@@ -16,12 +16,4 @@ export default async function handler(req) {
     const r = await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':process.env.ANTHROPIC_API_KEY},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2000,messages:[{role:'user',content:prompt}]})
-    });
-    if(!r.ok){const e=await r.json();return new Response(JSON.stringify({error:e.error?.message||'API error'}),{status:500,headers:{...ch,'Content-Type':'application/json'}});}
-    const d=await r.json();
-    return new Response(JSON.stringify({text:d.content[0].text}),{status:200,headers:{...ch,'Content-Type':'application/json'}});
-  } catch(e) {
-    return new Response(JSON.stringify({error:'Error: '+e.message}),{status:500,headers:{...ch,'Content-Type':'application/json'}});
-  }
-}
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:2000,messages:[{role:'user',content:prompt}]})
