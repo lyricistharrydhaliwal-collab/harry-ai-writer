@@ -1,28 +1,36 @@
 export const config = { runtime: 'edge' };
 
+const ALLOWED_ORIGINS = [
+  'https://www.lyricistharrydhaliwal.com',
+  'https://lyricistharrydhaliwal.com',
+  'http://localhost:3000'
+];
+
 export default async function handler(req) {
+  const origin = req.headers.get('origin') || '';
+  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  };
+
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      headers: {
-        'Access-Control-Allow-Origin': 'https://www.lyricistharrydhaliwal.com',
-        'Access-Control-Allow-Methods': 'POST',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      }
-    });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 });
+    return new Response('Method not allowed', { status: 405, headers: corsHeaders });
   }
 
   try {
     const body = await req.json();
     const { type, lang, tone, topic } = body;
 
-    if (!topic || topic.length > 500) {
-      return new Response(JSON.stringify({ error: 'Invalid topic' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
+    if (!topic || topic.trim().length === 0) {
+      return new Response(JSON.stringify({ error: 'Topic is required' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
@@ -46,13 +54,13 @@ export default async function handler(req) {
     };
 
     const prompt = `You are a creative writing assistant for Harry Dhaliwal Shamashpuria, a Punjabi lyricist from Winnipeg, Canada.
-Write ${typeMap[type] || typeMap.blog} about: "${topic}"
+Write ${typeMap[type] || typeMap.blog} about: "${topic.trim()}"
 Language: ${langMap[lang] || langMap.punjabi}
 Tone: ${toneMap[tone] || toneMap.emotional}
 Write authentic, heartfelt content that resonates with Punjabi diaspora.
 End with: ✍🏽 via HarryDhaliwal.com`;
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const apiResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -66,34 +74,24 @@ End with: ✍🏽 via HarryDhaliwal.com`;
       })
     });
 
-    if (!response.ok) {
-      const err = await response.json();
-      return new Response(JSON.stringify({ error: err.error?.message || 'API error' }), {
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': 'https://www.lyricistharrydhaliwal.com'
-        }
+    if (!apiResponse.ok) {
+      const errData = await apiResponse.json();
+      return new Response(JSON.stringify({ error: errData.error?.message || 'API error' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    const data = await response.json();
+    const data = await apiResponse.json();
     const text = data.content[0].text;
 
     return new Response(JSON.stringify({ text }), {
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': 'https://www.lyricistharrydhaliwal.com'
-      }
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (e) {
-    return new Response(JSON.stringify({ error: e.message }), {
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': 'https://www.lyricistharrydhaliwal.com'
-      }
+    return new Response(JSON.stringify({ error: 'Server error: ' + e.message }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }\
     });
   }
 }
