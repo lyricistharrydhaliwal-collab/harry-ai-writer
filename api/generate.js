@@ -94,10 +94,15 @@ Keep it real, relatable, and modern — not forced translation.`,
   // ===== SIGNATURE RULE =====
   // English/Roman content -> English signature
   // Gurmukhi/Pure Punjabi content -> Gurmukhi signature
+  // EXACT spelling is hardcoded here — never let the model paraphrase or
+  // "correct" it, since that's what caused spelling mistakes before.
+  const ENGLISH_SIGNATURE = "Harry Dhaliwal Shamashpuria";
+  const GURMUKHI_SIGNATURE = "ਹੈਰੀ ਧਾਲੀਵਾਲ ਸ਼ਮਸ਼ਪੁਰੀਆ";
+
   const signatureRule =
     selectedLanguage === "gurmukhi" || selectedLanguage === "punjabi"
-      ? `End vich naveen line te sign karo: — ਹੈਰੀ ਧਾਲੀਵਾਲ ਸ਼ਮਸ਼ਪੁਰੀਆ`
-      : `End vich naveen line te sign karo: — Harry Dhaliwal Shamashpuria`;
+      ? `End vich naveen line te EXACTLY ehi text copy karke sign karo, ik akhar v idhar-udhar nahi karna: — ${GURMUKHI_SIGNATURE}`
+      : `End vich naveen line te EXACTLY ehi text copy karke sign karo, ik letter v idhar-udhar nahi karna: — ${ENGLISH_SIGNATURE}`;
 
   // Name-meaning and captions don't always need a poetic signature block,
   // but Harry asked for consistent signing across content, so we keep it
@@ -151,10 +156,41 @@ ${includeSignature ? signatureRule : "- Hashtags wala caption hai, koi signature
     }
 
     const data = await response.json();
-    const text = data?.content?.[0]?.text || "";
+    let text = data?.content?.[0]?.text || "";
 
     if (!text) {
       return res.status(500).json({ error: "Empty response from AI" });
+    }
+
+    // ===== SAFETY NET =====
+    // Even with strict instructions, models can occasionally drift on
+    // spelling. This catches common near-miss variants of the signature
+    // and force-corrects them to the exact approved spelling, so a wrong
+    // signature can never reach the visitor.
+    if (includeSignature) {
+      if (selectedLanguage === "gurmukhi" || selectedLanguage === "punjabi") {
+        const gurmukhiVariants = [
+          /ਹੈਰੀ\s+ਧਾਲੀਵਾਲ\s+ਸ਼ਮਸ਼ਾਪੁਰੀਆ/g,
+          /ਹੈਰੀ\s+ਧਾਲੀਵਾਲ\s+ਸ਼ਮਸ਼ਪੁਰੀਏ/g,
+          /ਹੈਰੀ\s+ਧਾਲੀਵਾਲ\s+ਸ਼ੰਮਸ਼ਪੁਰੀਆ/g,
+          /ਹੈਰੀ\s+ਦਲੀਵਾਲ\s+ਸ਼ਮਸ਼ਪੁਰੀਆ/g,
+          /ਹੈਰੀ\s+ਧਾਲੀਵਾਲ\s+ਸ਼ਮਸ਼ਪੁਰਿਆ/g,
+        ];
+        gurmukhiVariants.forEach((re) => {
+          text = text.replace(re, GURMUKHI_SIGNATURE);
+        });
+      } else {
+        const englishVariants = [
+          /Harry\s+Dhaliwal\s+Shamshpuria/gi,
+          /Harry\s+Dhaliwal\s+Shamaspuria/gi,
+          /Harry\s+Dhalliwal\s+Shamashpuria/gi,
+          /Harry\s+Dhaliwal\s+Shamashpuriya/gi,
+          /Harry\s+Dhaliwal\s+Shamashpooria/gi,
+        ];
+        englishVariants.forEach((re) => {
+          text = text.replace(re, ENGLISH_SIGNATURE);
+        });
+      }
     }
 
     return res.status(200).json({ result: text });
