@@ -16,13 +16,17 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { prompt, language } = req.body;
+  const { prompt, language, category, tone } = req.body;
 
   if (!prompt || prompt.trim() === "") {
     return res.status(400).json({ error: "Prompt is required" });
   }
 
-  // Language-specific instructions
+  const selectedLanguage = language || "roman";
+  const selectedCategory = category || "shayri";
+  const selectedTone = tone || "emotional";
+
+  // ===== LANGUAGE INSTRUCTIONS =====
   const languageInstructions = {
     roman: `Hamesha SIRF Roman Punjabi vich likho (Punjabi words, Roman script).
 Misal: "Dil nu chain nahi, teri yaad satandi hai..."
@@ -34,7 +38,7 @@ Koi Gurmukhi nahi, koi English nahi — sirf Roman Punjabi.`,
 
     punjabi: `Write in pure Punjabi language using natural Punjabi words and expressions.
 You may use either Gurmukhi or Roman script as fits the content.
-Focus on authentic Punjabi poetic tradition — tappa, mahiya, ghazal style.`,
+Focus on authentic Punjabi poetic tradition.`,
 
     mix: `Write in a natural Punjabi + English mix (Punglish style) that modern Punjabi youth use.
 Mix English words naturally into Punjabi sentences.
@@ -42,9 +46,63 @@ Example: "Dil da Wi-Fi teri taraf connect rehnda hai, signal strong hai par resp
 Keep it real, relatable, and modern — not forced translation.`,
   };
 
-  const selectedLanguage = language || "roman";
-  const languageGuide =
-    languageInstructions[selectedLanguage] || languageInstructions["roman"];
+  // ===== CATEGORY INSTRUCTIONS =====
+  const categoryInstructions = {
+    blog: `Tu ik blog post likh rahaa hain. Likho:
+- Ik catchy title
+- 3-5 paragraphs wala well-structured blog
+- Reader nu engage karan wala tone
+- Natural flow, jiwe ik real lyricist/storyteller likhda hai`,
+
+    shayri: `Tu shayri/poetry likh rahaa hain. Likho:
+- Ik complete shayri ya ghazal — adhi nahi
+- Har line vich gehri feeling
+- Natural rhythm jiwe asli Punjabi poets likhde ne`,
+
+    caption: `Tu social media caption likh rahaa hain. Likho:
+- Ik short, catchy caption (1-3 lines)
+- Uske baad 8-12 relevant hashtags (Punjabi + trending English hashtags mix)
+- Hashtags vakhre line te #hashtag format vich`,
+
+    story: `Tu ik short story likh rahaa hain. Likho:
+- Ik chhoti par complete kahani (beginning, middle, end)
+- Emotional ya relatable Punjabi characters/setting
+- 150-300 words de vich complete karo`,
+
+    name: `Tu naam da matlab dasan wala kaam kar rahaa hain. Likho:
+- Naam da origin (Punjabi/Sikh/Sanskrit jo v ho)
+- Naam da meaning/matlab
+- Naam naal judiya ik positive quality ya gun
+- 2-4 lines vich short aur sweet rakkho`,
+  };
+
+  // ===== TONE INSTRUCTIONS =====
+  const toneInstructions = {
+    emotional: "Tone: Deeply emotional, dil nu chhu jaan wala.",
+    motivational: "Tone: Motivational aur inspiring, padhan wale nu uth khalon da hosla de.",
+    nostalgic: "Tone: Nostalgic, purane dina di yaad dilaan wala, bachpan/pind/yaarana jihi feel.",
+    romantic: "Tone: Romantic aur pyaar bhariya, dil de jazbaat nu khubsurati naal pesh karo.",
+    funny: "Tone: Halka-phulka aur funny, hasi aaye par tameez wala.",
+    sad: "Tone: Sad/heartbreak, dard aur judaai da ehsaas.",
+    devotional: "Tone: Devotional aur spiritual, shraddha aur vishvaas naal bhariya.",
+  };
+
+  const languageGuide = languageInstructions[selectedLanguage] || languageInstructions["roman"];
+  const categoryGuide = categoryInstructions[selectedCategory] || categoryInstructions["shayri"];
+  const toneGuide = toneInstructions[selectedTone] || toneInstructions["emotional"];
+
+  // ===== SIGNATURE RULE =====
+  // English/Roman content -> English signature
+  // Gurmukhi/Pure Punjabi content -> Gurmukhi signature
+  const signatureRule =
+    selectedLanguage === "gurmukhi" || selectedLanguage === "punjabi"
+      ? `End vich naveen line te sign karo: — ਹੈਰੀ ਧਾਲੀਵਾਲ ਸ਼ਮਸ਼ਪੁਰੀਆ`
+      : `End vich naveen line te sign karo: — Harry Dhaliwal Shamashpuria`;
+
+  // Name-meaning and captions don't always need a poetic signature block,
+  // but Harry asked for consistent signing across content, so we keep it
+  // except where it would look odd (hashtags). We skip signature for captions.
+  const includeSignature = selectedCategory !== "caption";
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -59,17 +117,20 @@ Keep it real, relatable, and modern — not forced translation.`,
         max_tokens: 1500,
         system: `Tu ik mashoor Punjabi lyricist ate shayar hain — Harry Dhaliwal Shamashpuria di taraf ton likhda hain.
 
-Tera kaam hai sunder, dil nu chhandiya wali poetry likhna — shayri, ghazal, geet, ya kavita — jo bande de dil nu chhu jaave.
+CONTENT TYPE RULE:
+${categoryGuide}
 
 LANGUAGE RULE (MOST IMPORTANT):
 ${languageGuide}
 
-POETRY RULES:
-- Har line vich gehri feeling honi chahidi
-- Shayri natural honi chahidi, jive asli Punjabi poets likhde ne
-- Ek complete shayri/poem likho — adhi nahi
-- Koi explanation nahi, seedha poetry shuru karo
-- End vich — Harry Dhaliwal Shamashpuria likh ke sign karo`,
+TONE RULE:
+${toneGuide}
+
+GENERAL RULES:
+- Content natural hona chahida, jiwe asli Punjabi writer likhda hai
+- Koi extra explanation nahi, seedha content shuru karo
+- Koi preamble jiwe "Here is your..." nahi likhna
+${includeSignature ? signatureRule : "- Hashtags wala caption hai, koi signature nahi chahida"}`,
 
         messages: [
           {
