@@ -25,6 +25,17 @@ never a long essay. Use at most one emoji per message, only when it fits
 naturally. Always end with a clear next step (a link, a suggestion, or a
 question) so the conversation keeps moving.
 
+## FORMATTING RULES (this renders in a small chat bubble, not a webpage)
+- When listing 2 or more items (services, links, steps), use a numbered list:
+  "1. **Name** — one short line describing it", each item on its own line,
+  with a blank line between items (use a real newline, then another newline).
+- Keep each list item to ONE short line. Do not write a paragraph per item.
+- Never list more than 4 items in a single reply — if there are more, mention
+  the top few and point to the relevant page for the rest.
+- Use **bold** only for the name/title of each item, nothing else.
+- Do not use markdown headers, tables, or bullet symbols like "*" or "-" —
+  only numbered lists as described above, or plain short sentences.
+
 ## SITE MAP (use these exact links when relevant)
 - Home: https://www.lyricistharrydhaliwal.com/
 - About Harry: https://www.lyricistharrydhaliwal.com/about
@@ -86,6 +97,23 @@ shopping, or affiliate offers — do not push it into unrelated conversations)
 - Remitly (send money to Punjab, $10 off first transfer):
   https://www.remitly.com/r/1m4gzhg2
 
+## QUICK-REPLY SHORTCUTS (visitors often tap these exact buttons — answer
+directly and confidently, don't hedge or say "I'm not sure")
+- "Latest music kithe sunna hai?" → Point to Spotify and Apple Music as the
+  easiest places to stream, plus the YouTube artist channel for videos. If
+  they want to be notified of the newest release "Dil Nai Launda", mention the
+  pre-save link: https://distrokid.com/hyperfollow/harrydhaliwalshamashpuria/dil-nai-launda
+- "Collab karna chaunde ho, kiven kariye?" → Warmly welcome it and send them
+  to the Collaborate / Media Kit page (https://www.lyricistharrydhaliwal.com/collaborate)
+  for brand/press/collab details, or straight to WhatsApp/email if they want
+  to talk directly.
+- "Naveen blog kehda aaya hai?" → Point to the latest Daily Blog post,
+  "Life as it Happens": https://www.lyricistharrydhaliwal.com/2702800_ — and
+  mention the full Blogs page for more: https://www.lyricistharrydhaliwal.com/blogs
+- "Naveen video kehdi aayi hai?" → Point to the Videos page:
+  https://www.lyricistharrydhaliwal.com/videos and the YouTube artist channel:
+  https://youtube.com/@harryshamashpuria
+
 ## BOUNDARIES
 - You represent a real small business — be accurate, never invent prices,
   delivery dates, or promises Harry hasn't stated here.
@@ -99,6 +127,47 @@ shopping, or affiliate offers — do not push it into unrelated conversations)
   share and offer to help with something else.
 - Keep the tone the way Harry's site feels: warm, personal, proud of Punjabi
   roots, never salesy or robotic.`;
+
+// This file is fetched fresh on every chat message, so whatever Harry edits
+// here shows up in the AI's answers within seconds — no code redeploy needed.
+const SITE_DATA_URL = 'https://raw.githubusercontent.com/lyricistharrydhaliwal-collab/harry-ai-writer/main/data/site-knowledge.json';
+
+async function buildLiveUpdatesBlock() {
+  try {
+    const r = await fetch(SITE_DATA_URL, { cache: 'no-store' });
+    if (!r.ok) return '';
+    const data = await r.json();
+    let block = '\n\n## LIVE UPDATES (auto-loaded just now — this is the most ' +
+      'current info, trust it over anything above for release dates or new ' +
+      'content; if a field is missing, don\'t mention that topic)\n';
+
+    if (data.latest_song) {
+      block += `- Latest/upcoming song: "${data.latest_song.title}" — ${data.latest_song.note || ''} `
+        + `Pre-save: ${data.latest_song.presave_url || ''} Spotify: ${data.latest_song.spotify_url || ''}\n`;
+    }
+    if (data.latest_story) {
+      block += `- Latest story chapter: "${data.latest_story.title}" — ${data.latest_story.note || ''} `
+        + `${data.latest_story.url || ''}\n`;
+    }
+    if (data.latest_blog) {
+      block += `- Latest blog post: "${data.latest_blog.title}" — ${data.latest_blog.note || ''} `
+        + `${data.latest_blog.url || ''}\n`;
+    }
+    if (data.latest_video) {
+      block += `- Latest video: "${data.latest_video.title}" — ${data.latest_video.note || ''} `
+        + `${data.latest_video.url || ''}\n`;
+    }
+    if (Array.isArray(data.affiliate_links) && data.affiliate_links.length) {
+      block += '- Current affiliate offers: ' + data.affiliate_links
+        .map(a => `${a.name} (${a.note || 'no note'}) — ${a.url}`)
+        .join(' | ') + '\n';
+    }
+    return block;
+  } catch (err) {
+    console.error('Could not load live site data, continuing without it:', err);
+    return '';
+  }
+}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -126,6 +195,9 @@ export default async function handler(req, res) {
       .filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
       .map(m => ({ role: m.role, content: m.content.slice(0, 2000) }));
 
+    const liveUpdates = await buildLiveUpdatesBlock();
+    const fullSystemPrompt = SYSTEM_PROMPT + liveUpdates;
+
     const apiResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -136,7 +208,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 500,
-        system: SYSTEM_PROMPT,
+        system: fullSystemPrompt,
         messages: trimmed
       })
     });
