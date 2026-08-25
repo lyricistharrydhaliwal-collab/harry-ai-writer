@@ -53,11 +53,11 @@ question) so the conversation keeps moving.
   https://www.lyricistharrydhaliwal.com/harry-live-session
 
 ## FEATURED WRITTEN WORK
-- Daily Blog "Life as it Happens" — childhood memories, immigrant life, everyday
-  moments from Winnipeg: https://www.lyricistharrydhaliwal.com/2702800_
-- Serial story "ਉਹਦੀ ਚੁੱਪ ਬੋਲਦੀ ਸੀ" (8 chapters, starts with "ਤੇਰੀ ਮਰਜ਼ੀ") —
-  Chapter 1: https://www.lyricistharrydhaliwal.com/1279401_1
-  (Chapters 2-8 follow on the Blogs page)
+Harry regularly publishes new blog posts, story chapters, shayri, and videos
+directly on his own site. Do NOT rely on memory for "what's newest" — a
+LIVE SITE SNAPSHOT section is appended below, auto-scraped fresh from his
+real pages moments ago. Always trust that section over anything written here
+for "latest/newest" questions.
 
 ## SERVICES HARRY OFFERS (never invent prices — always say "contact for
 pricing" and point to WhatsApp/email; all custom work needs 2 weeks advance
@@ -93,26 +93,24 @@ reply — you cannot take orders or give quotes yourself)
 - TikTok: https://www.tiktok.com/@lyricsbyharrydhaliwal
 
 ## AFFILIATE (only mention if the visitor asks about sending money to Punjab,
-shopping, or affiliate offers — do not push it into unrelated conversations)
-- Remitly (send money to Punjab, $10 off first transfer):
-  https://www.remitly.com/r/1m4gzhg2
+shopping, or affiliate offers — do not push it into unrelated conversations.
+Check the LIVE SITE SNAPSHOT below for the current featured offer.)
 
 ## QUICK-REPLY SHORTCUTS (visitors often tap these exact buttons — answer
-directly and confidently, don't hedge or say "I'm not sure")
-- "Latest music kithe sunna hai?" → Point to Spotify and Apple Music as the
-  easiest places to stream, plus the YouTube artist channel for videos. If
-  they want to be notified of the newest release "Dil Nai Launda", mention the
-  pre-save link: https://distrokid.com/hyperfollow/harrydhaliwalshamashpuria/dil-nai-launda
+directly and confidently using the LIVE SITE SNAPSHOT below, don't hedge)
+- "Latest music kithe sunna hai?" → Point to Spotify and Apple Music to
+  stream. If the LIVE SITE SNAPSHOT shows an upcoming/pre-save song, mention
+  it with its link.
 - "Collab karna chaunde ho, kiven kariye?" → Warmly welcome it and send them
   to the Collaborate / Media Kit page (https://www.lyricistharrydhaliwal.com/collaborate)
   for brand/press/collab details, or straight to WhatsApp/email if they want
   to talk directly.
-- "Naveen blog kehda aaya hai?" → Point to the latest Daily Blog post,
-  "Life as it Happens": https://www.lyricistharrydhaliwal.com/2702800_ — and
-  mention the full Blogs page for more: https://www.lyricistharrydhaliwal.com/blogs
-- "Naveen video kehdi aayi hai?" → Point to the Videos page:
-  https://www.lyricistharrydhaliwal.com/videos and the YouTube artist channel:
-  https://youtube.com/@harryshamashpuria
+- "Naveen blog kehda aaya hai?" → Use the latest blog/story item from the
+  LIVE SITE SNAPSHOT. If it's missing, point to the Blogs page:
+  https://www.lyricistharrydhaliwal.com/blogs
+- "Naveen video kehdi aayi hai?" / "Naveen shayri kehdi aayi hai?" → Use the
+  matching item from the LIVE SITE SNAPSHOT if present, else point to the
+  Videos or Shayri page.
 
 ## BOUNDARIES
 - You represent a real small business — be accurate, never invent prices,
@@ -128,43 +126,117 @@ directly and confidently, don't hedge or say "I'm not sure")
 - Keep the tone the way Harry's site feels: warm, personal, proud of Punjabi
   roots, never salesy or robotic.`;
 
-// This file is fetched fresh on every chat message, so whatever Harry edits
-// here shows up in the AI's answers within seconds — no code redeploy needed.
-const SITE_DATA_URL = 'https://raw.githubusercontent.com/lyricistharrydhaliwal-collab/harry-ai-writer/main/data/site-knowledge.json';
+// ============================================================
+// LIVE SITE SCRAPING — reads Harry's own pages fresh on every
+// chat message. No manual file to edit, no code redeploy needed
+// when he publishes a new blog post, shayri, video, or offer.
+// A short in-memory cache (per warm serverless instance) keeps
+// repeat chats fast; it naturally resets on cold starts.
+// ============================================================
+
+let SNAPSHOT_CACHE = { data: null, ts: 0 };
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+function stripTags(html) {
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+async function fetchWithTimeout(url, ms) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    const r = await fetch(url, { signal: controller.signal });
+    return r.ok ? await r.text() : null;
+  } catch (err) {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Grabs the first <a class="hcard" href="..."> block — used on the Blogs page
+function extractFirstLinkedCard(html) {
+  if (!html) return null;
+  const m = html.match(/<a\b[^>]*href="([^"]+)"[^>]*class="[^"]*\bhcard\b[^"]*"[^>]*>([\s\S]*?)<\/a>/i)
+    || html.match(/<a\b[^>]*class="[^"]*\bhcard\b[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
+  if (!m) return null;
+  const text = stripTags(m[2]).slice(0, 160);
+  if (!text) return null;
+  return { url: m[1], text };
+}
+
+// Grabs the first <div class="hverse">...</div> — used on the Shayri page
+function extractFirstVerse(html) {
+  if (!html) return null;
+  const m = html.match(/<div\b[^>]*class="[^"]*\bhverse\b[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+  if (!m) return null;
+  const text = stripTags(m[1]).slice(0, 220);
+  return text ? { text } : null;
+}
+
+// Grabs the first <div class="haff">...</div> — used on the Affiliate page
+function extractFirstAffiliate(html) {
+  if (!html) return null;
+  const m = html.match(/<div\b[^>]*class="[^"]*\bhaff\b[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/i);
+  if (!m) return null;
+  const text = stripTags(m[1]).slice(0, 220);
+  return text ? { text } : null;
+}
+
+// Looks for a "Coming Soon" song announcement block — used on the Videos page
+function extractComingSoonSong(html) {
+  if (!html) return null;
+  const idx = html.indexOf('Coming Soon');
+  if (idx === -1) return null;
+  const slice = html.slice(idx, idx + 1500);
+  const h3 = slice.match(/<h3\b[^>]*>([\s\S]*?)<\/h3>/i);
+  const link = slice.match(/<a\s+href="([^"]+)"/i);
+  if (!h3) return null;
+  return { title: stripTags(h3[1]), url: link ? link[1] : null };
+}
+
+async function getLiveSiteSnapshot() {
+  const now = Date.now();
+  if (SNAPSHOT_CACHE.data && (now - SNAPSHOT_CACHE.ts) < CACHE_TTL_MS) {
+    return SNAPSHOT_CACHE.data;
+  }
+
+  const base = 'https://www.lyricistharrydhaliwal.com';
+  const [blogsHtml, shayriHtml, videosHtml, affiliateHtml] = await Promise.all([
+    fetchWithTimeout(base + '/blogs', 4000),
+    fetchWithTimeout(base + '/shayri', 4000),
+    fetchWithTimeout(base + '/videos', 4000),
+    fetchWithTimeout(base + '/affiliate', 4000)
+  ]);
+
+  const data = {
+    blog: extractFirstLinkedCard(blogsHtml),
+    shayri: extractFirstVerse(shayriHtml),
+    song: extractComingSoonSong(videosHtml),
+    affiliate: extractFirstAffiliate(affiliateHtml)
+  };
+
+  SNAPSHOT_CACHE = { data, ts: now };
+  return data;
+}
 
 async function buildLiveUpdatesBlock() {
   try {
-    const r = await fetch(SITE_DATA_URL, { cache: 'no-store' });
-    if (!r.ok) return '';
-    const data = await r.json();
-    let block = '\n\n## LIVE UPDATES (auto-loaded just now — this is the most ' +
-      'current info, trust it over anything above for release dates or new ' +
-      'content; if a field is missing, don\'t mention that topic)\n';
+    const snap = await getLiveSiteSnapshot();
+    const lines = [];
 
-    if (data.latest_song) {
-      block += `- Latest/upcoming song: "${data.latest_song.title}" — ${data.latest_song.note || ''} `
-        + `Pre-save: ${data.latest_song.presave_url || ''} Spotify: ${data.latest_song.spotify_url || ''}\n`;
-    }
-    if (data.latest_story) {
-      block += `- Latest story chapter: "${data.latest_story.title}" — ${data.latest_story.note || ''} `
-        + `${data.latest_story.url || ''}\n`;
-    }
-    if (data.latest_blog) {
-      block += `- Latest blog post: "${data.latest_blog.title}" — ${data.latest_blog.note || ''} `
-        + `${data.latest_blog.url || ''}\n`;
-    }
-    if (data.latest_video) {
-      block += `- Latest video: "${data.latest_video.title}" — ${data.latest_video.note || ''} `
-        + `${data.latest_video.url || ''}\n`;
-    }
-    if (Array.isArray(data.affiliate_links) && data.affiliate_links.length) {
-      block += '- Current affiliate offers: ' + data.affiliate_links
-        .map(a => `${a.name} (${a.note || 'no note'}) — ${a.url}`)
-        .join(' | ') + '\n';
-    }
-    return block;
+    if (snap.blog) lines.push(`- Latest blog/story item: "${snap.blog.text}" — ${snap.blog.url}`);
+    if (snap.shayri) lines.push(`- Featured/latest shayri on the Shayri page: "${snap.shayri.text}"`);
+    if (snap.song) lines.push(`- Upcoming/featured song: "${snap.song.title}"${snap.song.url ? ' — ' + snap.song.url : ''}`);
+    if (snap.affiliate) lines.push(`- Featured affiliate offer: "${snap.affiliate.text}"`);
+
+    if (lines.length === 0) return '';
+
+    return '\n\n## LIVE SITE SNAPSHOT (auto-scraped from lyricistharrydhaliwal.com ' +
+      'just now — this is the most current info for "what\'s new" questions; ' +
+      'trust it over anything above)\n' + lines.join('\n');
   } catch (err) {
-    console.error('Could not load live site data, continuing without it:', err);
+    console.error('Could not build live site snapshot, continuing without it:', err);
     return '';
   }
 }
