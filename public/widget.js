@@ -137,7 +137,7 @@
   }
   #hcInput{
     flex:1;border:1.5px solid #E0D8CF;border-radius:100px;
-    padding:0.65rem 1rem;font-size:0.87rem;outline:none;
+    padding:0.65rem 1rem;font-size:16px;outline:none;
     font-family:'Space Grotesk',sans-serif;color:#0D0D0D;min-width:0;
   }
   #hcInput:focus{border-color:#E07800;}
