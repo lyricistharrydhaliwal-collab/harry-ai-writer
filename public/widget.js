@@ -12,7 +12,7 @@
   #hcRoot, #hcRoot *{box-sizing:border-box;}
   #hcRoot{
     font-family:'Space Grotesk',sans-serif;
-    position:fixed;left:24px;bottom:28px;z-index:99998;
+    position:fixed;left:24px;bottom:28px;z-index:2147483000;
   }
 
   /* ---- Launcher bubble ---- */
@@ -200,9 +200,6 @@
   var container = document.createElement('div');
   container.innerHTML = WIDGET_HTML;
   document.body.appendChild(container);
-
-if(window.__harryConciergeLoaded) return;
-  window.__harryConciergeLoaded = true;
 
   var API_URL = `https://project-mcevs.vercel.app/api/concierge`;
   var STORE_KEY = `harryConciergeChat`;
